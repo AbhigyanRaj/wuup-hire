@@ -663,16 +663,16 @@ Manually update an interview's status.
 ## 5. Webhooks
 
 ### POST `/api/webhooks/bolna`
-Receives real-time events from Bolna during/after a call.
+Receives real-time events from Wuup Hire during/after a call.
 
-**Auth required:** No (verified by Bolna signature header)
+**Auth required:** No (verified by Wuup Hire signature header)
 
 **Headers:**
 ```
 x-bolna-signature: <hmac-signature>
 ```
 
-**Request Body (sent by Bolna):**
+**Request Body (sent by Wuup Hire):**
 ```json
 {
   "event": "call.started" | "call.ended" | "transcript.ready" | "recording.ready",
@@ -753,7 +753,7 @@ Check if the server and database are running.
 ### `SpeakerType` (in transcript)
 | Value | Meaning |
 |-------|---------|
-| `AI` | Bolna AI agent |
+| `AI` | Wuup Hire AI agent |
 | `CANDIDATE` | The interviewee |
 | `SYSTEM` | System message |
 
