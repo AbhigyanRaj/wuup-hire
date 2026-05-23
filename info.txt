@@ -1,0 +1,257 @@
+================================================================================
+                      AI INTERVIEW PLATFORM - IN-DEPTH TECHNICAL DOCUMENTATION
+================================================================================
+
+This document serves as the master blueprint for the AI Interview Platform. It outlines the architecture, database schema, exact API request/response structures, third-party integrations, and step-by-step user flows.
+
+================================================================================
+1. SYSTEM ARCHITECTURE & DATA FLOW
+================================================================================
+
+The platform is divided into a React Frontend (Recruiter Dashboard & Candidate Public Pages) and a Node.js/Express Backend. 
+
+[ 1. Recruiter Creates Job ] -> [ 2. Recruiter Adds Candidate ] -> [ 3. System Generates Unique Interview Link ]
+                                                                                |
+[ 5. Bolna Telephony Agent Dials Candidate Phone ] <- [ 4. Candidate Opens Link & Clicks "Start" ]
+            |
+[ 6. Call Concludes, Bolna Sends Webhook ] -> [ 7. Backend Parses Transcript ] -> [ 8. Groq/OpenAI Grades Transcript ]
+                                                                                |
+                                            [ 9. Recruiter Views Dashboard Scorecards & Analytics ]
+
+================================================================================
+2. DATABASE SCHEMA (Prisma ORM)
+================================================================================
+
+The relational database is PostgreSQL hosted on Supabase.
+
+A. User (Recruiter/Admin)
+-------------------------
+- id (String, UUID)
+- name (String)
+- email (String, Unique)
+- password (String, Hashed)
+
+B. Job
+------
+- id (String, UUID)
+- publicId (String, Unique) - For public shareable URLs.
+- title (String)
+- description (Text)
+- experienceLevel (Enum: Entry, Mid, Senior)
+- techStack (String[])
+- screeningQuestions (String[]) - Auto-generated or manually typed.
+- bolnaAgentId (String) - Maps this job to a specific Voice Agent.
+- createdById (String) -> Maps to User
+
+C. Candidate
+------------
+- id (String, UUID)
+- name (String)
+- email (String, Unique)
+- phone (String) - The number Bolna will dial (+91, +1, etc.)
+- resumeUrl (String, Optional)
+- linkedinUrl (String, Optional)
+
+D. Interview (The Core Entity)
+------------------------------
+- id (String, UUID)
+- candidateId (String)
+- jobId (String)
+- status (Enum: PENDING, IN_PROGRESS, COMPLETED, EVALUATED, REJECTED, HIRED)
+- interviewLink (String) - The public URL sent to the candidate.
+- bolnaExecutionId (String) - The unique call ID returned by Bolna.
+- webhookPayload (Json) - Raw JSON payload received from Bolna.
+- startedAt (DateTime)
+- completedAt (DateTime)
+- durationSeconds (Int)
+
+E. TranscriptMessage
+--------------------
+- id (String, UUID)
+- interviewId (String)
+- speaker (Enum: AI, CANDIDATE, SYSTEM)
+- message (Text)
+- timestamp (DateTime)
+
+F. Evaluation
+-------------
+- id (String, UUID)
+- interviewId (String) - 1:1 relation to Interview.
+- communicationScore (Int 1-10)
+- technicalScore (Int 1-10)
+- confidenceScore (Int 1-10)
+- engagementScore (Int 1-10)
+- overallScore (Int 1-10)
+- cheatingProbability (Int 0-100)
+- responseConsistency (Int 0-100)
+- fillerWordFrequency (Int 0-100)
+- sentimentScore (Int 0-100)
+- recommendation (Enum: HIRE, STRONG_HIRE, NO_HIRE, SHORTLIST)
+- summary (Text)
+- strengths (String[])
+- weaknesses (String[])
+- redFlags (String[])
+
+================================================================================
+3. IN-DEPTH API ENDPOINTS & PAYLOADS
+================================================================================
+
+--------------------------------------------------
+A. AUTHENTICATION MODULE (`/api/auth`)
+--------------------------------------------------
+1. POST /api/auth/register
+   - Body: `{ "name": "John", "email": "j@test.com", "password": "123" }`
+   - Returns: `{ "user": {...}, "token": "jwt_token..." }`
+
+2. POST /api/auth/login
+   - Body: `{ "email": "j@test.com", "password": "123" }`
+   - Returns: `{ "user": {...}, "token": "jwt_token..." }`
+
+3. GET /api/auth/me (Protected)
+   - Headers: `Authorization: Bearer <token>`
+   - Returns: Authenticated user object.
+
+--------------------------------------------------
+B. JOBS MODULE (`/api/jobs`) - PROTECTED
+--------------------------------------------------
+1. POST /api/jobs
+   - Body: 
+     {
+       "title": "Frontend Eng",
+       "description": "React developer...",
+       "experienceLevel": "Mid",
+       "techStack": ["React", "TypeScript"],
+       "bolnaAgentId": "agent-uuid-from-bolna",
+       "interviewDuration": 30,
+       "strictnessLevel": "Medium"
+     }
+   - Logic: Backend auto-generates `screeningQuestions` using AI if not provided.
+
+2. GET /api/jobs
+   - Returns: Array of Jobs belonging to the recruiter, including count of candidates.
+
+3. GET /api/jobs/:id
+   - Returns: Full job details + list of associated candidates.
+
+--------------------------------------------------
+C. CANDIDATES MODULE (`/api/candidates`) - PROTECTED
+--------------------------------------------------
+1. POST /api/candidates
+   - Body: `{ "name": "Alice", "email": "alice@test.com", "phone": "+1234567890", "jobId": "job-uuid" }`
+   - Logic: Creates Candidate AND automatically creates an `Interview` record linking them to the Job.
+   - Returns: Created Candidate + newly generated `interviewLink`.
+
+2. GET /api/candidates
+   - Returns: Paginated list of all candidates across all jobs.
+
+--------------------------------------------------
+D. INTERVIEWS MODULE (`/api/interviews`) - PROTECTED
+--------------------------------------------------
+1. GET /api/interviews/:interviewId
+   - Returns: Massive nested object used by the Recruiter Dashboard Details page.
+     Includes: `Candidate`, `Job`, `TranscriptMessages` array, and `Evaluation` object.
+
+2. PATCH /api/interviews/:interviewId/status
+   - Body: `{ "status": "SHORTLIST" }`
+   - Logic: Allows recruiter to manually advance candidate through the hiring pipeline.
+
+--------------------------------------------------
+E. PUBLIC INTERVIEW ENDPOINTS (`/api/interviews/public`) - UNAUTHENTICATED
+--------------------------------------------------
+These are called by the Candidate's browser when they open the unique link.
+
+1. GET /api/interviews/public/:interviewId
+   - Returns: Safe, public-facing metadata.
+     `{ "job": {"title": "Frontend Eng"}, "candidate": {"name": "Alice"} }`
+
+2. POST /api/interviews/public/:interviewId/start
+   - ACTION: This is the trigger. 
+   - Logic: 
+     1. Fetches Candidate Phone Number and Job Screening Questions.
+     2. Makes an external HTTP POST request to `https://api.bolna.dev/call`.
+     3. Passes `agent_id`, `recipient_phone_number`, and dynamic `variables` (questions).
+     4. Updates Interview status to `IN_PROGRESS`.
+   - Returns: `{ "message": "Call initiated successfully" }`
+
+--------------------------------------------------
+F. WEBHOOKS (`/api/webhooks`) - UNAUTHENTICATED
+--------------------------------------------------
+1. POST /api/webhooks/bolna
+   - This endpoint receives POST requests directly from Bolna's servers.
+   - Payload Structure:
+     {
+       "id": "bolna-call-execution-uuid",
+       "status": "completed",
+       "user_number": "+1234567890",
+       "messages": [
+         { "role": "assistant", "content": "Hello! Ready for the interview?" },
+         { "role": "user", "content": "Yes, let's begin." }
+       ]
+     }
+   - Logic (Phases 6 & 7):
+     1. Look up Interview by `payload.id` or `payload.execution_id`.
+     2. Save raw payload to DB for debugging.
+     3. Iterate through `messages`. Map `assistant` -> `AI`, `user` -> `CANDIDATE`.
+     4. Bulk insert into `TranscriptMessage` table.
+     5. Update Interview status to `COMPLETED`.
+     6. **Trigger AI Service background job** (See Section 4).
+
+--------------------------------------------------
+G. DASHBOARD ANALYTICS (`/api/dashboard`) - PROTECTED
+--------------------------------------------------
+1. GET /api/dashboard/stats
+   - Returns: `{ totalJobs, totalCandidates, pendingInterviews, completedEvaluations, recentCandidates }`
+   - Used for the Funnel UI.
+
+================================================================================
+4. IN-DEPTH AI EVALUATION PIPELINE
+================================================================================
+
+When Bolna finishes a call, we get a raw chat transcript. We need structured metrics.
+
+1. `bolna.processor.js` hands the raw array of messages to `ai.service.js`.
+2. `ai.service.js` formats the messages into a single text block:
+   [AI] Hello.
+   [CANDIDATE] Hi.
+3. It dynamically checks for `GROQ_API_KEY`. If found, it routes to Groq (`llama3-70b-8192`). If not, it falls back to `OPENAI_API_KEY` (`gpt-4o-mini`).
+4. It sends a highly specific Prompt Template to the LLM:
+   - System Prompt: "You are an expert technical recruiter and behavioral psychologist. Analyze this transcript..."
+   - JSON Enforced Format: We enforce `{ type: "json_object" }` so the LLM responds with a strictly structured JSON matching our `Evaluation` database schema.
+5. The LLM parses grammar, filler words, technical accuracy, and outputs integer scores (1-10) and arrays of strings for strengths/weaknesses.
+6. The backend parses this JSON and saves it to the `Evaluation` table.
+7. The Interview status changes to `EVALUATED`.
+
+================================================================================
+5. FRONTEND STRUCTURE & ROUTING
+================================================================================
+React app built with Vite, utilizing Tailwind CSS and Lucide React Icons.
+
+**Core Routes:**
+- `/` -> Landing Page
+- `/auth` -> Login / Registration
+- `/interview/:id` -> The Public Candidate Page. Renders instructions and the "Start Interview Now" button.
+- `/dashboard` -> Main Recruiter Funnel metrics.
+- `/dashboard/jobs` -> Data grid of all jobs.
+- `/dashboard/jobs/create` -> Form to build a new job profile.
+- `/dashboard/candidates` -> Master list of candidates.
+- `/dashboard/interviews` -> Kanban board / List of scheduled, in-progress, and completed interviews.
+- `/dashboard/interviews/:id` -> **The Core View**. Shows Candidate info on the left, full Chat UI transcript in the middle, and AI Scorecard/Radar charts on the right.
+
+================================================================================
+6. THIRD-PARTY INTEGRATIONS DEEP DIVE
+================================================================================
+
+**1. Bolna (Telephony AI)**
+- **Why we use it:** Instead of building WebRTC pipelines and maintaining Speech-to-Text models, Bolna handles ringing the physical phone, translating speech to text, running a low-latency LLM agent locally, and doing Text-to-Speech back to the phone.
+- **Agent ID:** Bolna agents are created in the Bolna Dashboard. We map the `AGENT_ID` in our `.env` file to trigger it.
+
+**2. Plivo (Underlying Carrier)**
+- Bolna sits on top of Plivo.
+- Note on India (+91) testing: Plivo actively blocks outbound robotic API calls between 9 PM and 9 AM IST due to TRAI (Telecom Regulatory Authority of India) spam laws. Calls will instantly return a "rescheduled" status if attempted during the night.
+
+**3. Supabase (PostgreSQL)**
+- Used strictly for high-performance PostgreSQL hosting. We bypass Supabase's REST APIs and use Prisma directly over connection pooling (`pgbouncer=true`).
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

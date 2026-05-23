@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//
+// ENUMS
+//
+
+enum InterviewStatus {
+  PENDING
+  LINK_SENT
+  IN_PROGRESS
+  COMPLETED
+  EVALUATED
+  SHORTLISTED
+  REJECTED
+  FAILED
+}
+
+enum SpeakerType {
+  AI
+  CANDIDATE
+  SYSTEM
+}
+
+enum RecommendationType {
+  STRONG_HIRE
+  HIRE
+  MAYBE
+  REJECT
+}
+
+//
+// MODELS
+//
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+
+  jobs      Job[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  publicId    String   @unique   // e.g. job_8skf93ab — safe for URLs & API responses
+  title       String
+  description String
+
+  screeningQuestions Json
+
+  experienceLevel String?
+  techStack       String?
+  interviewDuration String?
+  strictnessLevel   String?
+
+  bolnaAgentId String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  interviews  Interview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
+}
+
+model Candidate {
+  id        String   @id @default(cuid())
+
+  name        String
+  email       String   @unique
+  phone       String?
+  resumeUrl   String?
+  linkedinUrl String?
+
+  interviews Interview[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Interview {
+  id          String   @id @default(cuid())
+
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id])
+
+  status      InterviewStatus @default(PENDING)
+
+  bolnaCallId   String?
+  bolnaExecutionId String?
+  interviewLink String?
+  recordingUrl  String?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  durationSeconds Int?
+
+  webhookPayload Json?
+
+  transcriptMessages TranscriptMessage[]
+
+  evaluation Evaluation?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([status])
+}
+
+model TranscriptMessage {
+  id          String   @id @default(cuid())
+
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  speaker     SpeakerType
+
+  message     String   @db.Text
+
+  timestamp   DateTime
+
+  createdAt   DateTime @default(now())
+
+  @@index([interviewId])
+}
+
+model Evaluation {
+  id          String   @id @default(cuid())
+
+  interviewId String    @unique
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  //
+  // CORE SCORES
+  //
+
+  communicationScore Float?
+  technicalScore     Float?
+  confidenceScore    Float?
+  engagementScore    Float?
+
+  overallScore       Float?
+
+  //
+  // ADVANCED ANALYTICS
+  //
+
+  cheatingProbability Float?
+  responseConsistency Float?
+  fillerWordFrequency Float?
+  sentimentScore      Float?
+
+  //
+  // FINAL RESULT
+  //
+
+  recommendation RecommendationType?
+
+  summary String? @db.Text
+
+  strengths Json?
+  weaknesses Json?
+  redFlags  Json?
+
+  evaluatedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

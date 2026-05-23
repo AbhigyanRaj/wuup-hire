@@ -1,0 +1,21 @@
+graph TD
+    A[Frontend (React + Tailwind)] -->|API Requests| B[API Gateway / Express Server]
+
+    B --> C[Auth Service]
+    B --> D[Job Service]
+    B --> E[Candidate Service]
+    B --> F[Webhook Controller]
+
+    F --> G[Bolna Webhook Processor]
+    G --> H[Transcript Processor Service]
+    H --> I[AI Scoring Service]
+    I --> J[Database (MongoDB)]
+    D --> J
+    E --> J
+    C --> J
+
+    subgraph "Background / Async"
+        G --> K[Queue (BullMQ / Redis)]
+        K --> H
+        H --> I
+    end
