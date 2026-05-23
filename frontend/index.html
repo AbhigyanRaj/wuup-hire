@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wuup Hire</title>
+    <title>wuup hire</title>
+    <script>
+      (function() {
+        const text = "wuup hire • agentic AI • ";
+        let offset = 0;
+        setInterval(() => {
+          document.title = text.substring(offset) + text.substring(0, offset);
+          offset = (offset + 1) % text.length;
+        }, 350);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
