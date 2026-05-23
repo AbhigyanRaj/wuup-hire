@@ -12,7 +12,23 @@ const app = express();
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://wuup-hire.vercel.app",
+  "https://hire.wuup.in"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
