@@ -262,7 +262,7 @@ export const CreateJobPage = ({ navigate, editId }: { navigate: (p: string) => v
                 <input 
                   type="range" 
                   value={strictness}
-                  onChange={(e) => setStrictness(e.target.value)}
+                  onChange={(e) => setStrictness(Number(e.target.value))}
                   className="w-full accent-[#78d11d]" 
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 font-medium mt-1">

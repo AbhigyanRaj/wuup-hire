@@ -120,7 +120,7 @@ export const ScheduleInterviewModal = ({
                     onChange={(e) => setSelectedJobId(e.target.value)}
                     className="w-full h-11 px-4 rounded-sm border border-dashed border-slate-300 text-[13px] outline-none focus:border-slate-500 transition-all bg-white"
                   >
-                    {jobs.map(j => (
+                    {jobs.map((j: any) => (
                       <option key={j.id} value={j.id}>{j.title}</option>
                     ))}
                   </select>
@@ -137,7 +137,7 @@ export const ScheduleInterviewModal = ({
                     onChange={(e) => setSelectedCandidateId(e.target.value)}
                     className="w-full h-11 px-4 rounded-sm border border-dashed border-slate-300 text-[13px] outline-none focus:border-slate-500 transition-all bg-white"
                   >
-                    {candidates.map(c => (
+                    {candidates.map((c: any) => (
                       <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
                     ))}
                   </select>
