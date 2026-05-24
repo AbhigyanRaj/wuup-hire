@@ -49,7 +49,16 @@ export const InterviewDetailsPage = ({ navigate, id }: { navigate: (p: string) =
 
   const handleCopyLink = () => {
     if (!interview?.interviewLink) return;
-    navigator.clipboard.writeText(interview.interviewLink);
+    
+    let finalLink = interview.interviewLink;
+    try {
+      const url = new URL(interview.interviewLink);
+      finalLink = `${window.location.origin}${url.pathname}`;
+    } catch (e) {
+      // Fallback if not a valid URL
+    }
+    
+    navigator.clipboard.writeText(finalLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
