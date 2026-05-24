@@ -3,6 +3,14 @@ import { ChevronRight, ArrowRight, Menu, X } from "lucide-react";
 import { Logo } from "../common/Logo";
 
 export const Navbar = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
   return (
     <nav className="w-full bg-white border-b border-dashed border-slate-200">
       <div className="flex items-center justify-between h-14 px-4 sm:px-6">
@@ -24,12 +32,20 @@ export const Navbar = () => {
 
         {/* Right: CTA */}
         <div className="flex items-center gap-4">
-          <a href="/auth" className="hidden sm:flex items-center gap-1 text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-all">
-            Sign in
-          </a>
-          <a href="/auth" className="flex items-center gap-1 text-[13px] font-semibold text-slate-900 bg-[#78d11d] hover:bg-[#6ec219] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 px-4 py-1.5 rounded-sm shadow-sm group">
-            Get started <ChevronRight className="w-3 h-3 opacity-70 group-hover:translate-x-0.5 transition-transform" />
-          </a>
+          {isAuthenticated ? (
+            <a href="/dashboard" className="flex items-center gap-1 text-[13px] font-semibold text-slate-900 bg-[#78d11d] hover:bg-[#6ec219] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 px-4 py-1.5 rounded-sm shadow-sm group">
+              Go to Dashboard <ChevronRight className="w-3 h-3 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+            </a>
+          ) : (
+            <>
+              <a href="/auth" className="hidden sm:flex items-center gap-1 text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md transition-all">
+                Sign in
+              </a>
+              <a href="/auth" className="flex items-center gap-1 text-[13px] font-semibold text-slate-900 bg-[#78d11d] hover:bg-[#6ec219] hover:-translate-y-0.5 hover:shadow-md transition-all duration-300 px-4 py-1.5 rounded-sm shadow-sm group">
+                Get started <ChevronRight className="w-3 h-3 opacity-70 group-hover:translate-x-0.5 transition-transform" />
+              </a>
+            </>
+          )}
         </div>
       </div>
     </nav>

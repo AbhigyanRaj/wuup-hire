@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,13 @@ export const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeMessage, setActiveMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // If user already has a token, send them straight to dashboard
+    if (localStorage.getItem("token")) {
+      window.location.href = "/dashboard";
+    }
+  }, []);
 
   const showWipMessage = (key: string) => {
     setActiveMessage(key);
@@ -95,6 +102,7 @@ export const AuthPage = () => {
                 <input 
                   type="text" 
                   required
+                  autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane Doe"
@@ -108,6 +116,7 @@ export const AuthPage = () => {
               <input 
                 type="email" 
                 required
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="youremail@yourdomain.com"
@@ -120,6 +129,7 @@ export const AuthPage = () => {
               <input 
                 type="password" 
                 required
+                autoComplete={isLogin ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Your password"
