@@ -45,18 +45,36 @@ export const processBolnaWebhook = async (payload) => {
     });
 
     // 3. Extract and save transcript
-    const transcriptArray = payload.messages || payload.transcript || [];
+    const rawTranscript = payload.messages || payload.transcript || [];
     
-    if (transcriptArray.length > 0) {
+    let parsedMessages = [];
+    if (typeof rawTranscript === 'string') {
+      const lines = rawTranscript.split('\n').filter(l => l.trim().length > 0);
+      parsedMessages = lines.map(line => {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex !== -1) {
+          return {
+            speaker: line.substring(0, colonIndex).trim().toLowerCase(),
+            content: line.substring(colonIndex + 1).trim()
+          };
+        }
+        return { speaker: "system", content: line };
+      });
+    } else if (Array.isArray(rawTranscript)) {
+      parsedMessages = rawTranscript;
+    }
+    
+    if (parsedMessages.length > 0) {
       // Clear existing transcript if any to prevent duplicates on retries
       await prisma.transcriptMessage.deleteMany({
         where: { interviewId },
       });
 
-      const dbMessages = transcriptArray.map(msg => {
+      const dbMessages = parsedMessages.map(msg => {
         let speakerType = "SYSTEM";
-        if (msg.role === "assistant" || msg.speaker === "ai") speakerType = "AI";
-        if (msg.role === "user" || msg.speaker === "human") speakerType = "CANDIDATE";
+        const rawRole = (msg.role || msg.speaker || "").toLowerCase();
+        if (rawRole === "assistant" || rawRole === "ai") speakerType = "AI";
+        if (rawRole === "user" || rawRole === "human") speakerType = "CANDIDATE";
 
         return {
           interviewId,
@@ -81,7 +99,7 @@ export const processBolnaWebhook = async (payload) => {
     });
 
     // 5. Trigger AI Evaluation in background (Phase 7)
-    if (transcriptArray.length > 0) {
+    if (parsedMessages.length > 0) {
       console.log(`Triggering AI evaluation for interview ${interviewId}...`);
       
       const dbMessages = await prisma.transcriptMessage.findMany({ where: { interviewId }, orderBy: { timestamp: 'asc' }});
