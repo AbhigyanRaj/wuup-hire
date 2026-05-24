@@ -1,3 +1,12 @@
+const parseRecommendation = (rec) => {
+  if (!rec) return "MAYBE";
+  const upper = String(rec).toUpperCase();
+  if (upper.includes("STRONG")) return "STRONG_HIRE";
+  if (upper.includes("REJECT")) return "REJECT";
+  if (upper.includes("HIRE")) return "HIRE";
+  return "MAYBE";
+};
+
 export const parseEvaluationResponse = (rawResponse) => {
   try {
     let cleaned = rawResponse.trim();
@@ -24,8 +33,8 @@ export const parseEvaluationResponse = (rawResponse) => {
       fillerWordFrequency: (parsed.fillerWordFrequency || 0) / 100,
       sentimentScore: (parsed.sentimentScore || 0) / 100,
 
-      // Map 'overallRecommendation' to DB 'recommendation'
-      recommendation: parsed.overallRecommendation || "MAYBE",
+      // Map 'overallRecommendation' to DB 'recommendation' safely
+      recommendation: parseRecommendation(parsed.overallRecommendation || parsed.recommendation),
       summary: parsed.summary || "",
       strengths: parsed.strengths || [],
       weaknesses: parsed.weaknesses || [],
